@@ -4,11 +4,11 @@
 
 ## 優先度: 高
 
-### 1. アニメーションのBefore/After（GIF）が無い
+### 1. ~~アニメーションのBefore/After（GIF）が無い~~ → 対応済み
 
 - **課題**: このツールは「まばたき」「歩行」という動きそのものが成果物なのに、READMEには静止画すら無く、動きが一切伝わらない。
 - **影響**: 差分生成ツールという性質上、静止画のREADMEでは価値がほぼ伝わらない。ポートフォリオとして最も損している部分。
-- **修正法**: `scripts/verify_animation_output/` に既に `front.png` / `front_blink.png` / `diagonal.png` / `diagonal_blink.png` / `diagonal_walk2.png` 等の差分画像がある。これらをffmpeg等でアニメーションGIFに変換し（例: `front.png`→`front_blink.png` のまばたきループ、`front.png`→`diagonal_walk2.png` の歩行ループ）、READMEに埋め込む。
+- **修正法**: `scripts/business_character_a`（`img_to_pixcel_app` が生成した実際のバンドル）を `app/bundle.py` の `process_bundle()` に実際に通し、生成された `front.png` / `front_blink.png` / `front_walk1.png` / `front_walk2.png` から `docs/images/blink.gif` と `docs/images/walk.gif` を作成してREADMEに埋め込んだ。
 
 ### 2. フェーズ2・3（斜め・横向き・後ろ向き）が未検証
 
