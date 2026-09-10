@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PixelAnimator（仮称）— まばたき・歩行差分の生成</title>
+<style>
+  :root {
+    --bg: #0f1220;
+    --panel: #1b2038;
+    --panel-border: #3b5dc9;
+    --text: #e6e9f5;
+    --text-dim: #9aa3c0;
+    --error: #b13e53;
+    --ok: #38b764;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Yu Gothic UI", "Yu Gothic", Meiryo, sans-serif;
+    font-size: 14px;
+  }
+  #app {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 24px 16px 60px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  h1 { font-size: 20px; margin: 0; }
+  .sub { color: var(--text-dim); font-size: 13px; margin: 0; }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    padding: 16px 18px;
+  }
+
+  .row { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-end; }
+  button {
+    background: var(--panel-border);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 9px 18px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  input[type="file"] { color: var(--text-dim); font-size: 13px; }
+
+  .msg { padding: 10px 14px; border-radius: 6px; font-size: 13px; }
+  .msg.error { background: rgba(177,62,83,0.2); color: #ff9daa; border: 1px solid var(--error); }
+  .msg.ok { background: rgba(56,183,100,0.15); color: #8fe8ab; border: 1px solid var(--ok); }
+  .hint { color: var(--text-dim); font-size: 12px; }
+
+  .views { display: flex; gap: 20px; flex-wrap: wrap; }
+  .view-card { display: flex; flex-direction: column; gap: 8px; align-items: center; width: 220px; }
+  .view-card h3 { font-size: 13px; margin: 0; }
+  .preview-img {
+    width: 192px;
+    height: 192px;
+    image-rendering: pixelated;
+    background: repeating-conic-gradient(#2a2f4a 0% 25%, #1b2038 0% 50%) 50% / 16px 16px;
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 4px;
+  }
+  .frame-list { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+  .frame-list img {
+    width: 48px;
+    height: 48px;
+    image-rendering: pixelated;
+    background: repeating-conic-gradient(#2a2f4a 0% 25%, #1b2038 0% 50%) 50% / 8px 8px;
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 3px;
+  }
+  .mode-toggle { display: flex; gap: 4px; }
+  .mode-toggle button { padding: 4px 10px; font-size: 11px; background: rgba(255,255,255,0.08); }
+  .mode-toggle button.active { background: var(--panel-border); }
+</style>
+</head>
+<body>
+  <div id="app">
+    <div>
+      <h1>PixelAnimator（仮称）</h1>
+      <p class="sub">PixelForgeが出力したキャラクターアセットバンドル（フォルダ）を読み込ませると、まばたき・歩行の差分フレームを自動生成します。</p>
+    </div>
+
+    <div class="card">
+      <form id="animate-form">
+        <div class="row">
+          <div>
+            <label class="hint">バンドルフォルダを選択（manifest.json を含むフォルダごと）</label><br/>
+            <input type="file" id="folder-input" webkitdirectory directory multiple />
+          </div>
+          <button type="submit" id="submit-btn">生成する</button>
+        </div>
+        <p class="hint">正面のみ（フェーズ1）の場合は正面にも歩行差分が生成されます。斜め等がある場合、正面はまばたきのみになります。</p>
+      </form>
+    </div>
+
+    <div id="status"></div>
+
+    <div class="card" id="result-card" hidden>
+      <div class="views" id="views-container"></div>
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById("animate-form");
+    const statusEl = document.getElementById("status");
+    const resultCard = document.getElementById("result-card");
+    const viewsContainer = document.getElementById("views-container");
+    const submitBtn = document.getElementById("submit-btn");
+
+    function showMessage(text, kind) {
+      statusEl.innerHTML = `<div class="msg ${kind}">${text}</div>`;
+    }
+
+    function buildViewCard(viewName, frames) {
+      const card = document.createElement("div");
+      card.className = "view-card";
+
+      const title = document.createElement("h3");
+      title.textContent = viewName;
+      card.appendChild(title);
+
+      const previewImg = document.createElement("img");
+      previewImg.className = "preview-img";
+      card.appendChild(previewImg);
+
+      const modeToggle = document.createElement("div");
+      modeToggle.className = "mode-toggle";
+      const idleBtn = document.createElement("button");
+      idleBtn.type = "button";
+      idleBtn.textContent = "アイドル(まばたき)";
+      const walkBtn = document.createElement("button");
+      walkBtn.type = "button";
+      walkBtn.textContent = "歩行";
+      walkBtn.disabled = frames.walk.length < 2;
+      modeToggle.appendChild(idleBtn);
+      modeToggle.appendChild(walkBtn);
+      card.appendChild(modeToggle);
+
+      const frameList = document.createElement("div");
+      frameList.className = "frame-list";
+      [...frames.idle, ...frames.walk].forEach((url) => {
+        if (frameList.querySelector(`img[src="${url}"]`)) return;
+        const img = document.createElement("img");
+        img.src = url;
+        frameList.appendChild(img);
+      });
+      card.appendChild(frameList);
+
+      let timer = null;
+      function playSequence(seq, intervalMs) {
+        if (timer) clearInterval(timer);
+        let i = 0;
+        previewImg.src = seq[0];
+        if (seq.length < 2) return;
+        timer = setInterval(() => {
+          i = (i + 1) % seq.length;
+          previewImg.src = seq[i];
+        }, intervalMs);
+      }
+
+      idleBtn.addEventListener("click", () => {
+        idleBtn.classList.add("active");
+        walkBtn.classList.remove("active");
+        playSequence(frames.idle, 2800); // brief blink, long hold - docs/design/01-visual-concept.md §4 idle cadence
+      });
+      walkBtn.addEventListener("click", () => {
+        walkBtn.classList.add("active");
+        idleBtn.classList.remove("active");
+        playSequence(frames.walk, 260); // walk step cadence
+      });
+
+      idleBtn.click();
+      return card;
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const fileInput = document.getElementById("folder-input");
+      const files = fileInput.files;
+      if (!files || files.length === 0) {
+        showMessage("バンドルフォルダを選択してください", "error");
+        return;
+      }
+
+      const fd = new FormData();
+      for (const f of files) fd.append("files", f, f.webkitRelativePath || f.name);
+
+      submitBtn.disabled = true;
+      resultCard.hidden = true;
+      showMessage("生成中…", "ok");
+
+      try {
+        const res = await fetch("/api/animate", { method: "POST", body: fd });
+        const body = await res.json();
+        if (!body.ok) {
+          showMessage(body.error, "error");
+          return;
+        }
+
+        viewsContainer.innerHTML = "";
+        for (const [viewName, frames] of Object.entries(body.views)) {
+          viewsContainer.appendChild(buildViewCard(viewName, frames));
+        }
+        resultCard.hidden = false;
+        showMessage(`生成完了（${body.elapsedSeconds}秒、キャラクターID: ${body.characterId}）`, "ok");
+      } catch (err) {
+        showMessage("通信エラー: " + err.message, "error");
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+{
+  "characterId": "e824010e950d",
+  "views": {
+    "front": {
+      "idle": [
+        "front.png",
+        "front_blink.png"
+      ]
+    },
+    "diagonal": {
+      "idle": [
+        "diagonal.png",
+        "diagonal_blink.png"
+      ],
+      "walk": [
+        "diagonal.png",
+        "diagonal_walk2.png"
+      ]
+    }
+  }
+}

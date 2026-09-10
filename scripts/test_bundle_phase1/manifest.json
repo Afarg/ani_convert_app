@@ -1,0 +1,19 @@
+{
+  "characterId": "test-character",
+  "gridSize": 32,
+  "outputSize": 64,
+  "colors": 8,
+  "views": {
+    "front": {
+      "final": "front.png",
+      "pre": "front.pre.png",
+      "scale": 32.0,
+      "cropBox": [
+        225,
+        0,
+        828,
+        1024
+      ]
+    }
+  }
+}
